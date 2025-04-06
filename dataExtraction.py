@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import random
 from itertools import product
 from tqdm import tqdm
-
+from pydub import AudioSegment
 
 
 def search_and_download(term, output_dir='downloads', count=10, log_file='downloads_log.csv'):
@@ -136,8 +136,36 @@ def bulk_download_mp3():
     for term in search_terms[:10]:
         search_and_download(term)
 
+def split_raw_files(source_data_path='downloads', output_dir='downloads\segments', segment_length_ms=30000):
+    """
+    Splits each .mp3 file in source_data_path into smaller segments and saves them to output_dir.
+    """
+    os.makedirs(output_dir, exist_ok=True)
 
-def build_data_frame(folder_path='downloads', output_csv='chillhop_dataset.csv'):
+    raw_mp3_files = [f for f in os.listdir(source_data_path) if f.endswith('.mp3')]
+
+
+    for file_name in raw_mp3_files:
+        file_path = os.path.join(source_data_path, file_name)
+        try:
+            audio = AudioSegment.from_file(file_path)
+            duration_ms = len(audio)
+
+            for i in range(0, duration_ms, segment_length_ms):
+                segment = audio[i:i + segment_length_ms]
+                out_name = os.path.join(
+                    output_dir,
+                    f"{os.path.splitext(file_name)[0]}_part{i // segment_length_ms}.mp3"
+                )
+                segment.export(out_name, format="mp3")
+
+        except Exception as e:
+            print(f"❌ Failed to process {file_name}: {e}")
+
+
+
+
+def build_data_frame(folder_path='downloads\segments', output_csv='chillhop_dataset.csv'):
     feature_list = []
 
     mp3_files = [f for f in os.listdir(folder_path) if f.endswith('.mp3')]
@@ -150,16 +178,18 @@ def build_data_frame(folder_path='downloads', output_csv='chillhop_dataset.csv')
             features = extract_data_from_mp3(mp3_path)
             feature_list.append(features)
         except Exception as e:
-            print(f"❌ Error with {mp3_file}: {e}")
+            print(f"Error with {mp3_file}: {e}")
             continue
 
     df = pd.DataFrame(feature_list)
     df.to_csv(output_csv, index=False)
-    print(f"\n✅ Dataset saved to {output_csv} with {len(df)} rows.")
+    print(f"\nDataset saved to {output_csv} with {len(df)} rows.")
 
     return df
 
 def main_data_extraction():
-    bulk_download_mp3()
-    build_data_frame()
+    ##bulk_download_mp3()
+    split_raw_files()
+
+build_data_frame()
 
